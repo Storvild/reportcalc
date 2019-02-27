@@ -13,17 +13,19 @@ os.chdir(curdir)
 TEMP_DIR = os.path.join(curdir,'ods_temp')
 TEMP_CONTENT_DIR = os.path.join(TEMP_DIR,'content')
 TEMP_CONTENT_FILEPATH = os.path.join(TEMP_CONTENT_DIR, 'content.xml')
-TEMPLATE_FILEPATH = os.path.join(curdir,'5.17 Справка о наличии ценностей, учитываемых на забалансовых счетах.ods')
+#TEMPLATE_FILEPATH = os.path.join(curdir,'5.17 Справка о наличии ценностей, учитываемых на забалансовых счетах.ods')
+TEMPLATE_FILEPATH = os.path.join(curdir,'Тестовый файл.ods')
 RESULT_FILEPATH = os.path.join(TEMP_DIR, 'Result.ods')
 
 
 def get_content(source_ods):
-    """ Получение контента в виде строки """
+    """ Получение контента ods-файла в виде строки """
     with zipfile.ZipFile(source_ods, 'r') as odsfile:
         res = odsfile.read('content.xml')
         return res 
 
 def write_to_file(content, source_ods, destination_ods):
+    """ Запись контента в результирующий ods-файл """
     memfile_list = []
     # Считываем zip файл в память (массив memfile_list)
     with zipfile.ZipFile(source_ods, 'r') as odsfile:
@@ -42,8 +44,11 @@ def write_to_file(content, source_ods, destination_ods):
     return True
     
 def run_file(filepath):
-    import subprocess
+    """ Открытие файла связанной программой """
+    #import subprocess
     code = os.startfile(filepath)
+
+
 
 
 def change_content_etree(content):
@@ -112,20 +117,26 @@ def change_content_xpath(content):
     print(table1)
     #print(lxml.etree.iterparse(root))
     #print(dir(lxml.etree))
-    
+    print()
+    textp = spreadsheet.xpath('.//text:p' , namespaces=root.nsmap)
+    for i in textp:
+        print(i.text, i.tag)
+        
+    print()
+    exit()
     # Рекурсивный проход по дереву
     
     #table1 = spreadsheet.xpath('table:table[@table:name="табл_5_12"]', namespaces=root.nsmap)[0]
     for _, val in lxml.etree.iterwalk(table1):
         #print(k)
-        #print(val)
+        print(val.text, val.tag)
         #print(type(val))
         #try:
         if val.text and '#field2#' in val.text:
             val.text = val.text.replace('#field2#', '@@@@@0005@@@@@')
             #print(val.text)
             print(val.text)
-    print(lxml.etree.tostring(table1))    
+    #print(lxml.etree.tostring(table1))    
 
     #parent = table1.xpath('..')
     #print(parent)
@@ -156,10 +167,10 @@ content = get_content(TEMPLATE_FILEPATH) # Получаем контент
 
 #change_content_etree(content)    
 #change_content_objectify(content)
-#root = change_content_xpath(content) 
+root = change_content_xpath(content) 
 #content = lxml.etree.tostring(root)
 
-mytemp()
+#mytemp()
 
 # Обрабатываем content
 
