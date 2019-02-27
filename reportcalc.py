@@ -30,7 +30,9 @@ def write_to_file(content, source_ods, destination_ods):
         for item in odsfile.filelist:
             item = {'filename': item.filename, 'content': odsfile.read(item.filename), 'is_dir': item.is_dir()}
             memfile_list.append(item)
-
+    # Создать папку для исходящего файла если ее не существует
+    if not os.path.exists(os.path.dirname(destination_ods)):
+        os.makedirs(os.path.dirname(destination_ods))
     # Записываем в новый zip-архив с новым файлом content.xml
     with zipfile.ZipFile(destination_ods, 'w', compression=zipfile.ZIP_DEFLATED) as odsfile: #compression=ZIP_STORED|ZIP_DEFLATED|ZIP_BZIP2|ZIP_LZMA ,compresslevel=(от 0 до 9 для ZIP_DEFLATED и ZIP_LZMA)
         for item in memfile_list:
@@ -42,30 +44,122 @@ def write_to_file(content, source_ods, destination_ods):
 def run_file(filepath):
     import subprocess
     code = os.startfile(filepath)
+
+
+def change_content_etree(content):
+    root = lxml.etree.fromstring(content)
+    #for i in root.children('body'):
+    #    print(i)
+    #print(content)
+    #print(dir(root))
+    #print(dir(lxml.etree))
+
+
+    #table_list = root.xpath('office:document-content/office:body/office:spreadsheet/table:table')
+    # table_list = root.xpath('office:document-content', namespaces={'office': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0'}) #http://base.google.com/ns/1.0
+    # print(table_list)
+    # for i in root.getchildren():
+        # print(i)
+
+    res = lxml.etree.tostring(root) #, pretty_print=True
+    print(res)
+    return
     
+
+def change_content_objectify(content):
+    root = lxml.objectify.fromstring(content)
+    for i in root.body.spreadsheet.getchildren():
+        print(i, i.text, i.clear)
+        print(dir(i))
+    #print(dir(root.body.spreadsheet))
+    return
+
+def change_content_xpath(content):
+    from copy import deepcopy
+    root = lxml.etree.fromstring(content)
+    #<office:document-content xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" office:version="1.2">
+    #print(root.nsmap)
+    #table_list = root.xpath('office:document-content/office:body/office:spreadsheet/table:table', namespaces={'office':''})
+    #table_list = root.xpath('office:document-content/office:body/office:spreadsheet', namespaces={'office':'urn:oasis:names:tc:opendocument:xmlns:table:1.0'})
+    #print(root)
+    #table_list = root.xpath('.//office:document-content/office:body/office:spreadsheet', namespaces={'office':'urn:oasis:names:tc:opendocument:xmlns:office:1.0','table':'urn:oasis:names:tc:opendocument:xmlns:table:1.0'})
+    #table_list = root.xpath('office:body', namespaces={'office':'urn:oasis:names:tc:opendocument:xmlns:office:1.0','table':'urn:oasis:names:tc:opendocument:xmlns:table:1.0'})
+    #table_list = root.findall('office:body/office:spreadsheet', namespaces={'office':'urn:oasis:names:tc:opendocument:xmlns:office:1.0','table':'urn:oasis:names:tc:opendocument:xmlns:table:1.0'})
+    spreadsheet = root.xpath('office:body/office:spreadsheet', namespaces=root.nsmap)[0]
+    #print(spreadsheet)
+    print()
+    table_list = root.findall('office:body/office:spreadsheet/table:table', namespaces=root.nsmap)
+    for table in table_list:
+        sheetname = table.attrib['{{{table}}}name'.format(**root.nsmap)]
+        print(sheetname)
+        if sheetname=='List1':   
+            #spreadsheet.append(table.)
+            new_table = deepcopy(table)
+            new_table.attrib['{{{table}}}name'.format(**root.nsmap)] = 'List20'
+            table.addnext(new_table)
+
+            new_table2 = deepcopy(table)
+            new_table2.attrib['{{{table}}}name'.format(**root.nsmap)] = 'List22'
+            spreadsheet.append(new_table2)
+            # Проверить может встречаться <text:p>текст<text:s>с тегом обозначающим пробел</text:p>
+        #print(i.items())
+        #print(dir(table))
+
+    
+    print()
+    
+    table1 = spreadsheet.xpath('table:table[@table:name="List1"]', namespaces=root.nsmap)[0]
+    print(table1)
+    #print(lxml.etree.iterparse(root))
+    #print(dir(lxml.etree))
+    
+    # Рекурсивный проход по дереву
+    
+    #table1 = spreadsheet.xpath('table:table[@table:name="табл_5_12"]', namespaces=root.nsmap)[0]
+    for _, val in lxml.etree.iterwalk(table1):
+        #print(k)
+        #print(val)
+        #print(type(val))
+        #try:
+        if val.text and '#field2#' in val.text:
+            val.text = val.text.replace('#field2#', '@@@@@0005@@@@@')
+            #print(val.text)
+            print(val.text)
+    print(lxml.etree.tostring(table1))    
+
+    #parent = table1.xpath('..')
+    #print(parent)
+    
+    #table_list = root.findall('office:body/office:spreadsheet/table:table', namespaces=root.nsmap)
+    #for table in table_list:
+    #    print(table)
+        
+    #print(table_list)
+    #table_list = root.xpath('office:document-content', namespaces={'office': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0'}) #http://base.google.com/ns/1.0
+    #for i in table_list.getchildren():
+    #    print(i)
+    #print(table_list)
+    #print(root)
+    return root
+
+def mytemp():
+    root = lxml.etree.fromstring('<root><table-cell value-type="string"><p>This text<s/>with Space<t/> as tag s and t</p></table-cell></root>')
+    a = root.xpath('table-cell/p')[0].text
+    print(a)
+    
+    for _, val in lxml.etree.iterwalk(root):
+        print(val.text, val, val.tail)
+        #print(val)
+    pass
     
 content = get_content(TEMPLATE_FILEPATH) # Получаем контент
-root = lxml.etree.fromstring(content)
-#root = lxml.objectify.fromstring(content)
-#print(dir(root.body.spreadsheet))
 
-table_list = root.xpath('office:document-content/office:body/office:spreadsheet/table:table', namespaces={'office': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0','table':'urn:oasis:names:tc:opendocument:xmlns:table:1.0'})
-#table_list = root.xpath('office:document-content', namespaces={'office': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0'}) #http://base.google.com/ns/1.0
-print(table_list)
+#change_content_etree(content)    
+#change_content_objectify(content)
+#root = change_content_xpath(content) 
+#content = lxml.etree.tostring(root)
 
-
-for i in root.getchildren():
-    print(i)
-	
-#print(content)
-#print(dir(root))
-#print(dir(lxml.etree))
-
-
-
-#res = lxml.etree.tostring(root) #, pretty_print=True
-#print(res)
-#content = res
+mytemp()
 
 # Обрабатываем content
 
@@ -73,7 +167,7 @@ for i in root.getchildren():
 #run_file(RESULT_FILEPATH) # Запуск файла ods в OpenOffice
 
         
-print('OK')
+print('Ok')
         
         
         
