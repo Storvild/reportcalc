@@ -14,7 +14,7 @@ TEMP_DIR = os.path.join(curdir,'ods_temp')
 TEMP_CONTENT_DIR = os.path.join(TEMP_DIR,'content')
 TEMP_CONTENT_FILEPATH = os.path.join(TEMP_CONTENT_DIR, 'content.xml')
 #TEMPLATE_FILEPATH = os.path.join(curdir,'5.17 Справка о наличии ценностей, учитываемых на забалансовых счетах.ods')
-TEMPLATE_FILEPATH = os.path.join(curdir,'Тестовый файл.ods')
+TEMPLATE_FILEPATH = os.path.join(curdir,'TestReport001.ods')
 RESULT_FILEPATH = os.path.join(TEMP_DIR, 'Result.ods')
 
 
