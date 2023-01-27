@@ -5,6 +5,8 @@ import io
 import lxml
 import lxml.etree
 import lxml.objectify
+from bs4 import BeautifulSoup
+
 
 print('Python:', sys.version)
 curdir = os.path.dirname(__file__)
@@ -162,31 +164,8 @@ def mytemp():
         print(val.text, val, val.tail)
         #print(val)
     pass
-    
-content = get_content(TEMPLATE_FILEPATH) # Получаем контент
 
-#change_content_etree(content)    
-#change_content_objectify(content)
-root = change_content_xpath(content) 
-#content = lxml.etree.tostring(root)
 
-#mytemp()
-
-# Обрабатываем content
-
-#write_to_file(content, TEMPLATE_FILEPATH, RESULT_FILEPATH) # Записываем результирующий файл
-#run_file(RESULT_FILEPATH) # Запуск файла ods в OpenOffice
-
-        
-print('Ok')
-        
-        
-        
-        
-        
-        
-        
-        
 def old():
     # Создаем временную папку
     if not os.path.exists(TEMP_CONTENT_DIR):
@@ -218,7 +197,84 @@ def old():
 
     shutil.rmtree(TEMP_CONTENT_DIR) # Удаление временной директории со всем содержимым
 
-#print('ok')
+class ReportCalc:
+    def __init__(self):
+        self.filepath = ''
+        self.ods_xml_content: BeautifulSoup = None
+
+
+    def _get_content(self):
+        """ Получение контента ods-файла в виде строки """
+        with zipfile.ZipFile(self.filepath, 'r') as odsfile:
+            res = odsfile.read('content.xml')
+            return res
+
+    def _get_sheetnames(self):
+        """ Получение списка Листов """
+        sheets = self.ods_xml_content.find('office:body').find('office:spreadsheet').find_all('table:table')
+        res = [x['table:name'] for x in sheets]
+        return res
+
+    def _get_sheet(self, insheetname: str = ''):
+        """ Получить один лист по имени """
+        sheets = self.ods_xml_content.find('office:body').find('office:spreadsheet').find_all('table:table')
+        for s in sheets:
+            if s['table:name'] == insheetname or insheetname == '':
+                return s
+        return None
+
+    def _test_change_data(self):
+        sheet1: BeautifulSoup = self._get_sheet('List2')
+        tables = sheet1.find_all('table:table-row')
+        for t in tables:
+            cell_list = t.find_all('table-cell')
+            if cell_list:
+
+                p_list = cell.find_all('text:p')
+                if len(p_list) > 0:
+                    for p in p_list:
+                        print(p.string)
+                        p.string = 'test'
+                        print('>>', p.string)
+
+            #cell.text = 'test'
+        #print(tables)
+
+
+    def open_pattern(self, infilepath: str, insheetname: str='') -> bool:
+        """ Обязательный метод, которым открывается шаблон"""
+        self.filepath = infilepath
+        self.ods_xml_content = BeautifulSoup(self._get_content(), 'xml')
+        return True
+
+
+if __name__ == '__main__':
+    r = ReportCalc()
+    r.open_pattern(TEMPLATE_FILEPATH)
+    #print(r._get_sheet('List2'))
+    print(r._test_change_data())
+    print(r._get_sheet('List2'))
+
+
+    #content = get_content(TEMPLATE_FILEPATH) # Получаем контент
+    #print(content)
+    #change_content_etree(content)
+    #change_content_objectify(content)
+    #root = change_content_xpath(content)
+    #content = lxml.etree.tostring(root)
+
+    #mytemp()
+
+    # Обрабатываем content
+
+    #write_to_file(content, TEMPLATE_FILEPATH, RESULT_FILEPATH) # Записываем результирующий файл
+    #run_file(RESULT_FILEPATH) # Запуск файла ods в OpenOffice
+
+
+    print('Ok')
+
+
+
     
 # WISH
 # * Распаковка content.xml желательно в память
