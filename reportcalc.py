@@ -2,11 +2,13 @@ import sys, os
 import zipfile
 import shutil
 import io
+
+import bs4
 import lxml
 import lxml.etree
 import lxml.objectify
 from bs4 import BeautifulSoup
-
+from typing import Optional
 
 print('Python:', sys.version)
 curdir = os.path.dirname(__file__)
@@ -49,6 +51,7 @@ def run_file(filepath):
     """ Открытие файла связанной программой """
     #import subprocess
     code = os.startfile(filepath)
+    return code
 
 
 
@@ -68,7 +71,7 @@ def change_content_etree(content):
     # for i in root.getchildren():
         # print(i)
 
-    res = lxml.etree.tostring(root) #, pretty_print=True
+    res = lxml.etree.tostring(root)  #, pretty_print=True
     print(res)
     return
     
@@ -197,11 +200,12 @@ def old():
 
     shutil.rmtree(TEMP_CONTENT_DIR) # Удаление временной директории со всем содержимым
 
+
 class ReportCalc:
     def __init__(self):
         self.filepath = ''
-        self.ods_xml_content: BeautifulSoup = None
-
+        self.sheet_name = ''
+        self.ods_xml_content: Optional[BeautifulSoup] = None
 
     def _get_content(self):
         """ Получение контента ods-файла в виде строки """
@@ -215,31 +219,118 @@ class ReportCalc:
         res = [x['table:name'] for x in sheets]
         return res
 
-    def _get_sheet(self, insheetname: str = ''):
-        """ Получить один лист по имени """
+    def _get_sheet(self, insheetname: str = '') -> Optional[bs4.element.Tag]:
+        """ Получить один лист по имени
+        :param insheetname: Имя листа. Если передан '', то возвращается первый лист
+        :return: Тег листа <table:table>
+        """
         sheets = self.ods_xml_content.find('office:body').find('office:spreadsheet').find_all('table:table')
         for s in sheets:
             if s['table:name'] == insheetname or insheetname == '':
                 return s
         return None
 
-    def _test_change_data(self):
-        sheet1: BeautifulSoup = self._get_sheet('List2')
+    def find_row_id(self, insheet: bs4.element.Tag, intext: str) -> int:
+        rows = insheet.find_all('table:table-row')
+        for row_id, row in enumerate(rows):
+            for item in row.descendants:
+                if item.string and item.string == intext:
+                    return row_id
+
+    def find_row(self, insheet: bs4.element.Tag, intag_text: str, delete_tag: bool = True) -> bs4.element.Tag:
+        rows = insheet.find_all('table:table-row')
+        for row_id, row in enumerate(rows):
+            for item in row.descendants:
+                if item.string and item.string == intag_text:
+                    if delete_tag:
+                        item.decompose()
+                    return row
+
+    def replace_data(self, intag, fromstring, tostring):
+        """ Заменяет один текст другим внутри тега intag рекурсивно """
+        for tag in intag.descendants:
+            if type(tag) != bs4.NavigableString and tag.string:
+                tag.string = tag.string.replace(fromstring, tostring)
+        return intag
+
+    def insert_from_data(self, indata: list):
+        """ Вставка данных """
+        import copy
+        sheet = self._get_sheet(self.sheet_name)
+        #print(sheet.prettify())
+        row = self.find_row(sheet, '#begintable', delete_tag=True)
+        #row.decompose()  # Удаление тега
+        #tag = row.copy()  # Копия
+        #tag = row.clone()  # Копия
+        #tag = row.extract()
+        #sheet.append(tag)
+        #sheet.insert_before(tag)
+        #sheet.insert(0, tag)
+        for x in indata:
+
+            pass
+        tag = copy.copy(row)
+        self.replace_data(tag, 'строка', 'СТРОКА')
+        sheet.append(tag)
+
+        tag = copy.copy(row)
+        self.replace_data(tag, 'Текст', 'ТЕКСТ')
+        sheet.append(tag)
+
+        row.decompose()
+
+        print(sheet.prettify())
+
+        #print(rows)
+
+    def _test_replace_text(self, soup, old_text, new_text):
+        """ Временно """
+        for tag in soup.descendants:
+            if isinstance(tag, bs4.NavigableString):
+                if old_text in tag:
+                    tag.replace_with(tag.replace(old_text, new_text))
+        return soup
+
+
+    def _test_change_data(self, sheetname='List2'):
+        sheet1: BeautifulSoup = self._get_sheet(sheetname)
         tables = sheet1.find_all('table:table-row')
         for t in tables:
             cell_list = t.find_all('table-cell')
             if cell_list:
+                for cell in cell_list:
+                    # self._test_replace_text(cell, 'оформ', 'ОФОРМ')
+                    # Рекурсивный проход черзе descendants
+                    # for tag in cell.descendants:
+                    #     if type(tag) != bs4.NavigableString and tag.string:
+                    #         tag.string = tag.string.replace('оформ', 'ОФОРМ')
+                    #     print(tag)
+                    # Рекурсивный проход через find_all
+                    for tag in cell.find_all(['text:p', 'text:span'], recursive=True):
+                        if tag.string:
+                            tag.string = tag.string.replace('строка', 'СТРОКА')
+                    #    print(tag, '=>', tag.string)
+                    # XML tag="<p> текст <i> с внутренним </i> тегом </p>" tag.string дает None
+                    #   а без внутреннего тега <i> дает уже текст "текст с внутренним тегом"
+                    pass
 
-                p_list = cell.find_all('text:p')
-                if len(p_list) > 0:
-                    for p in p_list:
-                        print(p.string)
-                        p.string = 'test'
-                        print('>>', p.string)
+                        #if type(tag) == bs4.NavigableString:
+                        #    tag.replace('строка', 'СТРОКА')
+                        #    print(tag)
+                        #if tag is not None and tag.string:
+                        #    tag.string.replace_with("СТРОКА")
+                        #    print(tag.string)
+                # p_list = cell_list.find_all('text:p')
+                # if len(p_list) > 0:
+                #     for p in p_list:
+                #         print(p.string)
+                #         p.string = 'test'
+                #         print('>>', p.string)
 
             #cell.text = 'test'
         #print(tables)
-
+        print('\nXML Результат:')
+        print(sheet1.prettify())
 
     def open_pattern(self, infilepath: str, insheetname: str='') -> bool:
         """ Обязательный метод, которым открывается шаблон"""
@@ -247,13 +338,27 @@ class ReportCalc:
         self.ods_xml_content = BeautifulSoup(self._get_content(), 'xml')
         return True
 
+    def _test_difficult_tag(self):
+        inxml = '<main><p>Текст<i>с внутренним</i>тегом</p></main>'
+        soup = BeautifulSoup(inxml, 'xml')
+        p = soup.find_all('p')[0]
+        p.string = 'TEST'
+        print('p.string =', p.string)  # None
+
+
+        print(soup)
+        pass
 
 if __name__ == '__main__':
     r = ReportCalc()
-    r.open_pattern(TEMPLATE_FILEPATH)
+    #r.open_pattern(TEMPLATE_FILEPATH)
+    r.open_pattern(r"e:\Temp\Без имени 1.ods")
     #print(r._get_sheet('List2'))
-    print(r._test_change_data())
-    print(r._get_sheet('List2'))
+    #print(r._get_sheet())
+    print(r.insert_from_data([{"fullname": "Наименование1", "quantity": 5}, {"fullname": "Наименование2", "quantity": 10.22}]))
+    #print(r._test_change_data('Лист1'))
+    #print(r._test_difficult_tag())
+    #print(r._get_sheet('List2'))
 
 
     #content = get_content(TEMPLATE_FILEPATH) # Получаем контент
